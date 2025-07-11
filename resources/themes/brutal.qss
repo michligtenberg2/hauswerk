@@ -1,0 +1,39 @@
+QWidget {
+    background: #ffff00;
+    color: #181818;
+    font-family: 'Fira Mono', 'Consolas', 'Comic Sans MS', monospace;
+    font-size: 15px;
+    letter-spacing: 1px;
+}
+QPushButton {
+    background: #fff;
+    border: 3px solid #181818;
+    border-radius: 0;
+    color: #111;
+    font-weight: bold;
+    padding: 10px 20px;
+}
+QPushButton:hover {
+    background: #e3e300;
+}
+QTextEdit, QLineEdit, QSpinBox, QComboBox {
+    background: #fff;
+    border: 2px dashed #111;
+    color: #111;
+}
+QGroupBox {
+    border: 2.5px solid #181818;
+    border-radius: 0;
+    margin-top: 8px;
+    font-weight: bold;
+    background: #ffe;
+    padding: 6px;
+}
+QTabBar::tab:selected {
+    background: #e3e300;
+    font-weight: bold;
+}
+QProgressBar::chunk {
+    background-color: #111;
+    color: #fff;
+}
