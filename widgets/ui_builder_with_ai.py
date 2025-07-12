@@ -1,100 +1,101 @@
 from PyQt6.QtWidgets import (
-    QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QFrame, QListWidget, QListWidgetItem, QInputDialog, QLineEdit, QMessageBox, QTextEdit
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QGridLayout,
+    QLineEdit, QPushButton, QComboBox, QMessageBox, QApplication, QCheckBox, QSlider, QTextEdit, QProgressBar
 )
-from PyQt6.QtCore import Qt, QMimeData
-from PyQt6.QtGui import QDrag
-import json
-
-from core.ai_assist import suggest_layout
+from PyQt6.QtCore import Qt, QPoint
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QDrag, QPixmap, QMouseEvent, QPainter, QColor
+import sys
 
 class DroppableCell(QFrame):
-    def __init__(self, row, col, parent=None):
+    def __init__(self, parent, r, c):
         super().__init__(parent)
-        self.row = row
-        self.col = col
-        self.setFrameShape(QFrame.Shape.Box)
-        self.setFixedHeight(80)
+        self.r = r
+        self.c = c
         self.setAcceptDrops(True)
-        self.label = QLabel("↳ Drop of klik", self)
+        self.label = QLabel("", self)
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setStyleSheet("background-color: #f4f4f4;")
-        self.mousePressEvent = self.choose_widget
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.label)
+        self.setStyleSheet("background-color: #f0f0f0; border: 1px solid #ccc;")
+        self.setMinimumSize(80, 60)
 
-    def choose_widget(self, event):
-        items = ["QLabel", "QCheckBox", "QSlider", "QPushButton", "QProgressBar", "QTextEdit"]
-        item, ok = QInputDialog.getItem(self, "Widget kiezen", "Selecteer widget:", items, 0, False)
-        if ok and item:
-            self.set_widget(item)
-
-    def set_widget(self, name):
-        self.label.setText(name)
-        self.setStyleSheet("background-color: #d9f9d9;")
-        parent = self.parent()
-        if hasattr(parent, 'update_live_preview'):
-            parent.update_live_preview()
-
-    def dragEnterEvent(self, event):
+    def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasText():
             event.acceptProposedAction()
 
-    def dropEvent(self, event):
+    def dropEvent(self, event: QDropEvent):
         widget_name = event.mimeData().text()
         self.set_widget(widget_name)
         event.acceptProposedAction()
 
-class DraggableListWidget(QListWidget):
-    def __init__(self):
-        super().__init__()
-        self.setDragEnabled(True)
+    def set_widget(self, name):
+        self.label.setText(name)
+        self.setStyleSheet("background-color: #d9f9d9; border: 1px solid #ccc;")
+        self.parent().update_live_preview()
 
-    def startDrag(self, supported_actions):
-        item = self.currentItem()
-        if item:
-            mime = QMimeData()
-            mime.setText(item.text())
+class WidgetPalette(QWidget):
+    def __init__(self, parent):
+        super().__init__(parent)
+        layout = QVBoxLayout(self)
+        self.widgets = ["QLabel", "QCheckBox", "QSlider", "QPushButton", "QTextEdit", "QProgressBar"]
+        for w in self.widgets:
+            lbl = DraggableLabel(w, self)
+            layout.addWidget(lbl)
+        layout.addStretch()
+
+class DraggableLabel(QLabel):
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+        self.setStyleSheet("padding: 6px; border: 1px solid #aaa; background: #fafaff;")
+        self.setMinimumWidth(100)
+
+    def mousePressEvent(self, event: QMouseEvent):
+        if event.button() == Qt.MouseButton.LeftButton:
             drag = QDrag(self)
+            mime = self.createMimeData()
             drag.setMimeData(mime)
+            pixmap = QPixmap(self.size())
+            pixmap.fill(Qt.GlobalColor.transparent)
+            painter = QPainter(pixmap)
+            painter.setBrush(QColor("#aaddff"))
+            painter.drawRect(0, 0, pixmap.width(), pixmap.height())
+            painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, self.text())
+            painter.end()
+            drag.setPixmap(pixmap)
             drag.exec()
 
+    def createMimeData(self):
+        from PyQt6.QtCore import QMimeData
+        mime = QMimeData()
+        mime.setText(self.text())
+        return mime
+
 class UIBuilder(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("UI Builder")
-        self.grid_rows = 6
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.grid_rows = 3
         self.grid_cols = 2
+        self.cells = {}
         self.init_ui()
 
     def init_ui(self):
-        # Toolbox
-        self.toolbox = DraggableListWidget()
-        self.toolbox.setFixedWidth(200)
-        for widget_name in ["QLabel", "QCheckBox", "QSlider", "QPushButton", "QProgressBar", "QTextEdit"]:
-            self.toolbox.addItem(QListWidgetItem(widget_name))
+        main_layout = QHBoxLayout(self)
 
-        # Canvas
-        self.canvas = QWidget()
-        self.grid_layout = QGridLayout()
-        self.grid_layout.setSpacing(8)
-        self.canvas.setLayout(self.grid_layout)
+        # Left: Palette
+        palette = WidgetPalette(self)
+        main_layout.addWidget(palette)
 
-        self.cells = {}
+        # Center: Grid
+        grid_frame = QFrame(self)
+        grid_layout = QGridLayout(grid_frame)
         for r in range(self.grid_rows):
             for c in range(self.grid_cols):
-                cell = DroppableCell(r, c, parent=self)
-                self.grid_layout.addWidget(cell, r, c)
+                cell = DroppableCell(self, r, c)
                 self.cells[(r, c)] = cell
+                grid_layout.addWidget(cell, r, c)
+        main_layout.addWidget(grid_frame)
 
-        # Plugin name input
-        self.plugin_name_input = QLineEdit("CanvasPlugin")
-        self.plugin_name_input.setPlaceholderText("Voer pluginnaam in...")
-
-        # Code preview
-        self.code_preview = QTextEdit()
-        self.code_preview.setReadOnly(True)
-        self.code_preview.setStyleSheet("background-color: #f8f8f8; font-family: monospace; font-size: 11px;")
-
-        # Preview panel
+        # Right: Placeholder for preview
         preview_wrapper = QVBoxLayout()
         preview_title = QLabel("🔍 Live Preview")
         preview_title.setStyleSheet("font-weight: bold; padding: 4px;")
@@ -103,20 +104,11 @@ class UIBuilder(QWidget):
         self.preview_layout = QVBoxLayout(self.preview_panel)
         preview_wrapper.addWidget(preview_title)
         preview_wrapper.addWidget(self.preview_panel)
-
-        # Main layout
-        main_layout = QHBoxLayout()
-        left_col = QVBoxLayout()
-        left_col.addWidget(self.plugin_name_input)
-        left_col.addWidget(self.toolbox)
-        left_col.addWidget(self.code_preview)
-        main_layout.addLayout(left_col)
-        main_layout.addWidget(self.canvas)
         main_layout.addLayout(preview_wrapper)
-        self.setLayout(main_layout)
 
     def update_live_preview(self):
-        # Leeg oude preview netjes
+        from PyQt6.QtWidgets import QLabel, QCheckBox, QSlider, QPushButton, QTextEdit, QProgressBar
+        # Remove old preview widgets
         for i in reversed(range(self.preview_layout.count())):
             item = self.preview_layout.itemAt(i)
             if item.widget():
@@ -131,150 +123,29 @@ class UIBuilder(QWidget):
                     seen.add((r, c))
                     if widget == "QLabel":
                         w = QLabel("Voorbeeld Label")
+                        self.preview_layout.addWidget(w)
                     elif widget == "QCheckBox":
                         w = QCheckBox("Voorbeeld Checkbox")
+                        self.preview_layout.addWidget(w)
                     elif widget == "QSlider":
                         w = QSlider(Qt.Orientation.Horizontal)
+                        self.preview_layout.addWidget(w)
                     elif widget == "QPushButton":
                         w = QPushButton("Voorbeeld Knop")
+                        self.preview_layout.addWidget(w)
                     elif widget == "QTextEdit":
                         w = QTextEdit("Logvenster voorbeeld")
                         w.setReadOnly(True)
+                        self.preview_layout.addWidget(w)
                     elif widget == "QProgressBar":
                         w = QProgressBar()
                         w.setValue(42)
-                    else:
-                        continue
-                    w.setStyleSheet("margin: 4px;")
-                    self.preview_layout.addWidget(w)
+                        self.preview_layout.addWidget(w)
 
-        self.preview_panel.setStyleSheet("background-color: #ffffff; padding: 8px;")
-
-    def set_widget(self, r, c, name):
-        self.cells[(r, c)].set_widget(name)
-        self.update_live_preview()
-
-    def save_layout_to_json(self, filename="layout.json"):
-        layout_data = []
-        for r in range(self.grid_rows):
-            for c in range(self.grid_cols):
-                cell = self.cells[(r, c)]
-                widget = cell.label.text().strip()
-                layout_data.append({
-                    "row": r,
-                    "col": c,
-                    "widget": widget if widget.startswith("Q") else ""
-                })
-        from pathlib import Path
-        fpath = Path(__file__).parent / filename
-        with open(fpath, "w") as f:
-            json.dump(layout_data, f, indent=2)
-        print(f"💾 Layout opgeslagen als {fpath}")
-
-    def load_layout_from_json(self, filename="layout.json"):
-        from pathlib import Path
-        fpath = Path(__file__).parent / filename
-        if not fpath.exists():
-            print("⚠️ Layoutbestand niet gevonden.")
-            return
-        with open(fpath, "r") as f:
-            layout_data = json.load(f)
-        for item in layout_data:
-            r, c = item["row"], item["col"]
-            widget = item.get("widget", "")
-            if widget and widget.startswith("Q"):
-                self.cells[(r, c)].set_widget(widget)
-
-    def export_plugin(self, plugin_name=None):
-        if plugin_name is None:
-            plugin_name = self.plugin_name_input.text().strip()
-            if not plugin_name or any(c in plugin_name for c in " ./\\:;"):
-                QMessageBox.warning(self, "Fout", "Ongeldige pluginnaam.")
-                return
-
-        lines = [
-            "from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox, QSlider, QTextEdit, QProgressBar",
-            "from PyQt6.QtCore import Qt",
-            "",
-            f"class {plugin_name}(QWidget):",
-            "    def __init__(self):",
-            "        super().__init__()",
-            f"        self.setWindowTitle('{plugin_name}')",
-            "        layout = QVBoxLayout()"
-        ]
-
-        added = False
-        for r in range(self.grid_rows):
-            for c in range(self.grid_cols):
-                cell = self.cells[(r, c)]
-                widget = cell.label.text().strip()
-                if widget.startswith("Q"):
-                    var = widget.lower()
-                    lines.append(f"        self.{var}_{r}_{c} = {widget}()")
-                    if widget == "QLabel":
-                        lines.append(f"        self.{var}_{r}_{c}.setText('Label {r},{c}')")
-                    if widget == "QTextEdit":
-                        lines.append(f"        self.{var}_{r}_{c}.setReadOnly(True)")
-                    lines.append(f"        layout.addWidget(self.{var}_{r}_{c})")
-                    added = True
-
-        if not added:
-            QMessageBox.warning(self, "Fout", "Geen widgets aanwezig om te exporteren.")
-            return
-
-        lines.append("        self.setLayout(layout)")
-        from pathlib import Path
-        path = Path(__file__).parent / "widgets"
-        path.mkdir(exist_ok=True)
-        fpath = path / f"{plugin_name.lower()}.py"
-        with open(fpath, "w") as f:
-            f.write("\n".join(lines))
-
-        # Toon in code preview
-        self.code_preview.setPlainText("\n".join(lines))
-        print(f"✅ Plugin gegenereerd: {fpath}")
-
-    def apply_ai_layout(self):
-        prompt, ok = QInputDialog.getText(self, "AI Plugin Assistent", "Wat wil je bouwen?")
-        if ok and prompt:
-            layout = suggest_layout(prompt)
-            for item in layout:
-                r, c = item["row"], item["col"]
-                widget = item["widget"]
-                if (r, c) in self.cells:
-                    self.cells[(r, c)].set_widget(widget)
-            self.update_live_preview()
-
-# Test-launcher
-if __name__ == '__main__':
-    from PyQt6.QtWidgets import QApplication, QPushButton, QVBoxLayout, QHBoxLayout
-    import sys
+if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = UIBuilder()
-
-    export_btn = QPushButton("Genereer plugin")
-    save_btn = QPushButton("Sla layout op")
-    load_btn = QPushButton("Laad layout")
-    ai_btn = QPushButton("✨ AI-suggestie")
-
-    export_btn.clicked.connect(lambda: window.export_plugin())
-    save_btn.clicked.connect(lambda: window.save_layout_to_json("layout.json"))
-    load_btn.clicked.connect(lambda: window.load_layout_from_json("layout.json"))
-    ai_btn.clicked.connect(lambda: window.apply_ai_layout())
-
-    button_row = QHBoxLayout()
-    button_row.addWidget(export_btn)
-    button_row.addWidget(save_btn)
-    button_row.addWidget(load_btn)
-    button_row.addWidget(ai_btn)
-
-    layout = QVBoxLayout()
-    layout.addWidget(window)
-    layout.addLayout(button_row)
-
-    container = QWidget()
-    container.setLayout(layout)
-    container.setWindowTitle("Hauswerk UI Builder + AI")
-    container.resize(960, 700)
-    container.show()
+    w = UIBuilder()
+    w.setWindowTitle("UI Builder with AI")
+    w.resize(900, 400)
+    w.show()
     sys.exit(app.exec())
