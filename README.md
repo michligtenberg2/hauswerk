@@ -1,7 +1,7 @@
 📘 Deze pagina is ook beschikbaar in het [Engels](docs/README_EN.md)
 
 <p align="center">
-  <img src="bob_edit.svg" alt="Hauswerk ASCII logo">
+  <img src="hauswerk_artwork.svg" alt="Hauswerk ASCII logo">
 </p>
 
 # 🏗️ Hauswerk
