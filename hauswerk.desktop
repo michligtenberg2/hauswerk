@@ -1,0 +1,3 @@
+[Desktop Entry]
+Name=Hauswerk
+Exec=python __main__.py

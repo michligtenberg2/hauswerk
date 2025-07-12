@@ -1,0 +1,1 @@
+# PyInstaller spec content goes here

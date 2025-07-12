@@ -1,0 +1,13 @@
+[changelog]
+header = "# Changelog"
+body = '''
+{{#each commits}}
+### {{commit.message | upperFirst}}
+- {{commit.body}}
+{{/each}}
+'''
+trim = true
+sort_commits = "oldest"
+
+[git]
+conventional_commits = true

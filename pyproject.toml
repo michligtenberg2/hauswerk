@@ -1,0 +1,17 @@
+[project]
+name = "hauswerk"
+version = "0.1.0"
+description = "Visual plugin builder for media tools"
+authors = [{name = "Jouw Naam"}]
+requires-python = ">=3.10"
+dependencies = [
+    "PyQt6",
+    "opencv-python",
+    "Pillow",
+    "numpy",
+    "ffmpeg-python"
+]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
